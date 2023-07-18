@@ -1,13 +1,13 @@
 # Introduction and Installation
 This GitHub repository contains the simulation and case study materials used within the paper "Efficient computation of high-dimensional penalized proportional hazard mixed models using the piecewise exponential approximation" by Heiling et al., which describes the phmmPen_FA method. 
 
-The code to run the phmmPen_FA method will provided in the glmmPen R package available on CRAN at https://cran.r-project.org/web/packages/glmmPen/index.html and will also be available in the GitHub respository https://github.com/hheiling/glmmPen. As of 06/12/2023, these locations have not yet been updated.
+The code to run the phmmPen_FA method is currently available in the GitHub respository https://github.com/hheiling/glmmPen. Eventually, this code will provided in the glmmPen R package available on CRAN at https://cran.r-project.org/web/packages/glmmPen/index.html. As of 07/18/2023, the CRAN package has not yet been updated.
 
-Install glmmPen R package using the following R code:
+Install glmmPen R package from the GitHub repository using the following code:
 
 ```
-install.packages("glmmPen")
-library(glmmPen)
+library(devtools)
+install_github("hheiling/glmmPen")
 ```
 
 This respository contains the code to load the contents of the simulations and case study results and create the tables in the paper as well as the code to run the simulations and the code to run the case study analyses.
