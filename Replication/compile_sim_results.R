@@ -26,7 +26,7 @@ extract_r = function(path, sims, sim_type,
   ## labs = labels of columns of out_mat
   labs = c(str_c("Beta",1:(p_true)),"TP % Fixef","FP % Fixef",
            "TP % Ranef","FP % Ranef",
-           "Median Time (hrs)","Abs. Dev. (Mean)")
+           "Median Time (hrs)","Abs. Dev. (Mean)","Frobenius Norm (Mean)") # ,"L1 Norm (Mean)"
   out_mat = matrix(0, nrow = length(sims), ncol = length(labs))
   colnames(out_mat) = labs
   rownames(out_mat) = sim_type
@@ -67,6 +67,9 @@ extract_r = function(path, sims, sim_type,
   # Save convergence information
   EM_iter_lst = list()
   
+  # Save B matrix information
+  B_lst = list()
+  
   for(m in 1:length(sims)){
     
     files = list.files(path = str_c(path, sims[m]), full.names = T)
@@ -95,6 +98,11 @@ extract_r = function(path, sims, sim_type,
     event_rate_mat = matrix(NA, nrow = length(files), ncol = 2)
     colnames(event_rate_mat) = c("death_rate","censor_rate")
     # fwp_summary =  matrix(NA, nrow = length(files, ncol = 6))
+    B_sim_lst = list()
+    # Sigma error metrics: Frobenius norm values, L1 norm values
+    norm_Frobenius = numeric(length(files))
+    norm_L1 = numeric(length(files))
+    
     
     for(f in 1:length(files)){
       # load output list object
@@ -109,13 +117,52 @@ extract_r = function(path, sims, sim_type,
       }
       vars_mat[f,] = output$vars_mat
       # presc_mat[f,] = output$presc_mat
-      opt_res = rbind(opt_res, output$results_optim[[1]])
       EM_iter = rbind(EM_iter,output$results_all[,"EM_iter"])
       time_mat[f] = output$time_mat[1,3]
       select_res[[f]] = output$results_all
+      results_all = output$results_all
+      results_optim = matrix(results_all[which.min(results_all[,"BICq"]),], nrow = 1)
+      colnames(results_optim) = colnames(results_all)
+      
+      # extract estimated B matrix
+      # compare estimated random effects covariance matrix with the true covariance matrix
+      ## Notation: Sigma = random effects covariance matrix
+      ## Calculate Frobenius norm (Euclidean norm) of the difference between the
+      ##    estimated and true covariance matrix. Standardize by dividing by number of columns in the matrix
+      ##    Note: In many papers, the Frobenius norm is standardized by dividing by the
+      ##      square root of the product of (nrow * ncol) of the matrix, which in this square matrix 
+      ##      case is equal to ncol (number columns of matrix)
+      ## Calculate L1 norm of the difference between the estimated and true covariance matrix
+      ##    L1 norm: for each column, calculate sum of absolute value of element-wise differences
+      ##      between the matrices; report maximum of these column sums
+      ##      Take average over the number of elements in the columns
+      ## Note: When calculating norm, only compare portion of covariance matrix where 
+      ##    (a) the columns correspond to the true random effects (rows/columns 1 to p_true) AND
+      ##    (b) the columns correspond to random effects that were selected as non-zero in the 
+      ###       selected model (some subset of rows/columns 1 to p_true)
       if(!is.null(output$r_est)){
         r_est[f] = output$r_est
+        idx_tmp = 1:ncol(results_optim)
+        B_vec = results_optim[1,which(str_detect(colnames(results_optim),"B") & idx_tmp >= 12)]
+        B_mat = t(matrix(B_vec, nrow = r_est[f], ncol = p_tot+1))
+        B_sim_lst[[f]] = B_mat
+        B_true = output$B_true
+        Sigma_est = B_mat %*% t(B_mat)
+        Sigma_true = B_true %*% t(B_true)
+        sigma_idx = which(vars_mat[f,c(1:q)] != 0)
+        
+        if(length(sigma_idx) >= 1){
+          norm_Frobenius[f] = sqrt(sum((Sigma_est[sigma_idx,sigma_idx,drop=FALSE] - Sigma_true[sigma_idx,sigma_idx,drop=FALSE])^2)) / length(sigma_idx)
+          norm_L1[f] = max(colSums(abs(Sigma_est[sigma_idx,sigma_idx,drop=FALSE] - Sigma_true[sigma_idx,sigma_idx,drop=FALSE]))) / length(sigma_idx)
+        }else{
+          norm_Frobenius[f] = NA
+          norm_L1[f] = NA
+        }
+        
       }
+      # if(!is.null(output$r_est)){
+      #   r_est[f] = output$r_est
+      # }
       y_tmp = output$y_times
       if(!is.null(y_tmp)){
         y_summary[f,] = summary(y_tmp)[1:6]
@@ -142,6 +189,8 @@ extract_r = function(path, sims, sim_type,
     
     time_lst[[m]] = time_mat
     
+    B_lst[[m]] = B_sim_lst
+    
     event_rate_lst[[m]] = event_rate_mat
     
     # True and false positives - fixed effects, random effects,
@@ -164,6 +213,7 @@ extract_r = function(path, sims, sim_type,
     out[p_true+4] = sum(vars_mat[,-c(1:q)] != 0) / length(files)*(1 / (p_tot-q+1) * 100)
     out[p_true+5] = median(time_mat / 3600)
     out[p_true+6] = mean(abs_dev, na.rm = TRUE)
+    out[p_true+7] = mean(norm_Frobenius, na.rm = TRUE)
     
     out_mat[m,] = out
     
