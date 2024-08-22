@@ -32,6 +32,21 @@ path = "~/paper_phmmPen_FA/Replication"
 source(sprintf("%s/replication.R",path))
 ```
 
+# Case Study Sensitivity Analyses
+
+This repository includes additional investigations into the case study output for alternative combinations of the elastic net parameter (values {0.7,0.8,0.9,1.0}) and number of latent factors r (GR estimate of 2 or manually-specified value of 3).
+
+The folder Replication/Paper_Results/ contains the case study summary results for all elastic net and latent factor r parameters listed above in the output object "PDAC_Comparison_Results_revision.RData".
+
+In order to examine output such as the c-index values, times, and graphical and numerical summaries of the selected predictors, please run the following code:
+
+```
+# Define path to the Replication/ folder contents
+path = "~/paper_phmmPen_FA/Replication"
+# Run code
+source(sprintf("%s/replication_case_study_sensitivity.R",path))
+```
+
 # Running Simulations
 
 The Simulations/ folder contains the code used to run all of the simulations. There are separate files for each set of simulations described in the paper:
