@@ -75,11 +75,14 @@ print(xtable(res$out_mat[,-c(1:(p_true))]))
 r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
 print(xtable(r_out, digits = c(0,2,0,0,0)))
 
+
 ######################################################################################################################
 # Variable selection results when the number of fixed effects does not equal the number of random effects, p=100
 ######################################################################################################################
 
 print("Variable selection results when the number of fixed effects does not equal the number of random effects, p=100")
+
+p_true = 10
 
 load("Paper_Results/alt_num_ranef.RData")
 # This will load the 'res' list object with the relevant output
@@ -91,11 +94,15 @@ print(xtable(res$out_mat[,-c(1:(p_true))]))
 r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
 print(xtable(r_out, digits = c(0,2,0,0,0)))
 
+
+
 ######################################################################################################################
 # Variable selection results when purposefully underestimating the number of latent factors r, p=100
 ######################################################################################################################
 
 print("Variable selection results when purposefully underestimating the number of latent factors r, p=100")
+
+p_true = 5
 
 load("Paper_Results/alt_rval.RData")
 # This will load the 'res' list object with the relevant output
@@ -134,6 +141,8 @@ print(xtable(res$out_mat[,-c(1:(p_true))]))
 # r estimate results
 r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
 print(xtable(r_out, digits = c(0,2,0,0,0)))
+
+
 
 ######################################################################################################################
 # Case Study phmmPen_FA
