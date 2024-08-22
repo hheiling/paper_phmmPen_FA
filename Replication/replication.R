@@ -47,13 +47,111 @@ r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
 print(xtable(r_out[idx,], digits = c(0,2,0,0,0)))
 
 ######################################################################################################################
+# Variable selection using ncvreg::cv.ncvsurv() (fixed-effects only)
+######################################################################################################################
+
+print("Variable selection using ncvreg fixed effects only selection, p=100")
+
+load("Paper_Results/ncvsurv.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+
+######################################################################################################################
+# Variable selection applied to Weibull-simulated mixed effects survival data, p=100
+######################################################################################################################
+
+print("Weibull-simulated mixed effects survival data variable selection results, p=100")
+
+load("Paper_Results/Weibull.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+# r estimate results
+r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
+print(xtable(r_out, digits = c(0,2,0,0,0)))
+
+######################################################################################################################
+# Variable selection results when the number of fixed effects does not equal the number of random effects, p=100
+######################################################################################################################
+
+print("Variable selection results when the number of fixed effects does not equal the number of random effects, p=100")
+
+load("Paper_Results/alt_num_ranef.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+# r estimate results
+r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
+print(xtable(r_out, digits = c(0,2,0,0,0)))
+
+######################################################################################################################
+# Variable selection results when purposefully underestimating the number of latent factors r, p=100
+######################################################################################################################
+
+print("Variable selection results when purposefully underestimating the number of latent factors r, p=100")
+
+load("Paper_Results/alt_rval.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+######################################################################################################################
+# Variable selection results using different numbers of time intervals J=5,6, p=100
+######################################################################################################################
+
+print("Variable selection results using different numbers of time intervals J=5,6, p=100")
+
+load("Paper_Results/alt_J_5and6.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+# r estimate results
+r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
+print(xtable(r_out, digits = c(0,2,0,0,0)))
+
+######################################################################################################################
+# Variable selection results using different numbers of time intervals J=9,10, p=100
+######################################################################################################################
+
+print("Variable selection results using different numbers of time intervals J=9,10, p=100")
+
+load("Paper_Results/alt_J_9and10.RData")
+# This will load the 'res' list object with the relevant output
+
+# True/False Positives and Timing
+print(xtable(res$out_mat[,-c(1:(p_true))]))
+
+# r estimate results
+r_out = data.frame(Avg_r = res$rest_avg_pseudo, res$rest_pseudo)
+print(xtable(r_out, digits = c(0,2,0,0,0)))
+
+######################################################################################################################
 # Case Study phmmPen_FA
 ######################################################################################################################
 print("Case Study: phmmPen_FA results")
 # Estimated $r$ for the Growth Ratio procedure
 
-load("Paper_Results/PDAC_Selection_Results.RData")
+load("Paper_Results/PDAC_Selection_Results_revision.RData")
 # This will load the 'res' list object with the relevant output
+
+# C-index values for each combination of elastic net parameter and latent factor r values
+cidx_mat = matrix(NA, nrow = length(res), ncol = 1)
+colnames(cidx_mat) = c("phmmPen_FA")
+rownames(cidx_mat) = names(res)
+for(i in 1:length(res)){
+  cidx_mat[i,1] = round(res[[i]]$c_index[1],4)
+}
+print(cidx_mat)
 
 # Estimated r from the Growth Ratio procedure
 idx = which(str_detect(names(res),"GR_est"))
@@ -96,10 +194,48 @@ for(i in 1:length(res)){
   print(df)
 }
 
+# Overlap of fixed effects when comparing alpha values \{0.7,0.8,0.9\} for manually-set r=3
+idx = seq(from = 2, to = 7, by = 2)
+# print("Overlapping Fixef: alpha = (0.7,0.8,0.9), r = GR")
+comp_idx = idx
+fixef_overlap = NULL
+fixef_any = NULL
+df = NULL
+for(j in 1:length(comp_idx)){
+  fixef_all = res[[comp_idx[j]]]$coef_vals
+  fixef_non0 = str_sub(names(fixef_all[which((fixef_all != 0))]),start=1)
+  if(is.null(fixef_overlap)){
+    fixef_overlap = fixef_non0
+    fixef_any = fixef_non0
+  }else{
+    fixef_overlap = intersect(fixef_overlap, fixef_non0)
+    fixef_any = union(fixef_any, fixef_non0)
+  }
+  
+  df_tmp = data.frame(TSP = str_sub(names(fixef_all),start=1),
+                      coef = fixef_all, Scenario = names(res)[comp_idx[j]])
+  if(is.null(df)){
+    df = df_tmp
+  }else{
+    
+    df = rbind(df,df_tmp)
+  }
+}
+# print(fixef_overlap)
+# print(length(fixef_overlap))
+
+df = df[which(df$TSP %in% fixef_any),]
+p = ggplot(data = df) + geom_col(mapping = aes(y = coef, x = TSP, fill = Scenario),
+                                 position = "dodge") +
+  theme(axis.text.x = element_text(angle = 270)) + # , vjust = 0.5, hjust=1
+  ylab("Log Hazard Ratio") +
+  ggtitle("Overlapping Fixef: alpha = (0.7,0.8,0.9), r = 3")
+print(p)
 
 
-# Overlap of fixed effects when comparing alpha values \{0.8,0.9\} for r = GR estimate
-idx = seq(from = 3, to = 6, by = 2)
+
+# Overlap of fixed effects when comparing alpha values \{0.7,0.8,0.9\} for r = GR estimate
+idx = seq(from = 1, to = 6, by = 2)
 comp_idx = idx
 fixef_overlap = NULL
 fixef_any = NULL
@@ -136,7 +272,7 @@ p = ggplot(data = df) + geom_col(mapping = aes(y = coef, x = TSP, fill = Scenari
 print(p)
 
 
-# Overlap of fixed effects when comparing GR vs r=3 for a particular set of conditions
+# Overlap of fixed effects when comparing GR vs r=3 for a particular value of elastic net parameter (0.7 to 1.0)
 idx = seq(from = 1, to = length(res), by = 2)
 for(i in idx){
   # print(sprintf("Overlapping Fixef: %s",names(res)[i]))
@@ -175,47 +311,6 @@ for(i in idx){
     ggtitle(sprintf("%s fixed effects", names(res)[i]))
   print(p)
 }
-
-# Overlap of fixed effects when comparing alpha values \{0.7,0.8,0.9\} for a particular value of r (GR estimate)
-
-idx = seq(from = 1, to = 6, by = 2)
-# print("Overlapping Fixef: alpha = (0.7,0.8,0.9), r = GR")
-comp_idx = idx
-fixef_overlap = NULL
-fixef_any = NULL
-df = NULL
-for(j in 1:length(comp_idx)){
-  fixef_all = res[[comp_idx[j]]]$coef_vals
-  fixef_non0 = str_sub(names(fixef_all[which((fixef_all != 0))]),start=2)
-  if(is.null(fixef_overlap)){
-    fixef_overlap = fixef_non0
-    fixef_any = fixef_non0
-  }else{
-    fixef_overlap = intersect(fixef_overlap, fixef_non0)
-    fixef_any = union(fixef_any, fixef_non0)
-  }
-  
-  df_tmp = data.frame(TSP = str_sub(names(fixef_all),start=2),
-                      coef = fixef_all, Scenario = names(res)[comp_idx[j]])
-  if(is.null(df)){
-    df = df_tmp
-  }else{
-    
-    df = rbind(df,df_tmp)
-  }
-}
-# print(fixef_overlap)
-# print(length(fixef_overlap))
-
-df = df[which(df$TSP %in% fixef_any),]
-p = ggplot(data = df) + geom_col(mapping = aes(y = coef, x = TSP, fill = Scenario),
-                                 position = "dodge") +
-  theme(axis.text.x = element_text(angle = 270)) + # , vjust = 0.5, hjust=1
-  ylab("Log Hazard Ratio") +
-  ggtitle("Overlapping Fixef: alpha = (0.7,0.8,0.9), r = GR")
-print(p)
-
-
 
 # Number non-zero random effects in best model:
   
