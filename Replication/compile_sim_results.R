@@ -5,7 +5,7 @@ path_sims = "~/"
 # Define directory where to store simulation results
 path_output = "~/Paper_Results"
 
-# extract_r: Function to extract relevant information from simulation results
+# Extract relevant information from simulation results
 extract_r = function(path, sims, sim_type,
                      p_tot = 100, p_true = 5, q = 6,
                      r_true_vec = 3, trace = 0,
@@ -95,6 +95,7 @@ extract_r = function(path, sims, sim_type,
     select_res = list()
     r_input = numeric(length(files))
     y_summary = matrix(NA, nrow = length(files), ncol = 6)
+    colnames(y_summary) = c("Min","Q1","Median","Q3","Max","Mean")
     event_rate_mat = matrix(NA, nrow = length(files), ncol = 2)
     colnames(event_rate_mat) = c("death_rate","censor_rate")
     # fwp_summary =  matrix(NA, nrow = length(files, ncol = 6))
@@ -165,10 +166,7 @@ extract_r = function(path, sims, sim_type,
       # }
       y_tmp = output$y_times
       if(!is.null(y_tmp)){
-        y_summary[f,] = summary(y_tmp)[1:6]
-        if(f == 1){
-          colnames(y_summary) = names(summary(y_tmp))[1:6]
-        }
+        y_summary[f,] = c(min(y_tmp),quantile(y_tmp,probs = c(0.25,0.5,0.75)),max(y_tmp),mean(y_tmp))
       }
       if(!is.null(output$death_rate)){
         event_rate_mat[f,1] = output$death_rate
@@ -201,10 +199,11 @@ extract_r = function(path, sims, sim_type,
     
     for(i in 1:p_true){
       out[i] = mean(beta_mat[which(beta_mat[,i] != 0),i])
+      # Note: will be NA if never != 0
+      beta_all_avg[m,i] = mean(beta_mat[which(beta_mat[,i] != 0),i])
     }
     for(i in 1:q){
       # Note: will be NA if never != 0
-      beta_all_avg[m,i] = mean(beta_mat[which(beta_mat[,i] != 0),i])
       vars_all_avg[m,i] = mean(vars_mat[which(vars_mat[,i] != 0),i])
     }
     out[p_true+1] = sum(beta_mat[,c(1:p_true)] != 0) / length(files) * (1 / (p_true) * 100)
@@ -261,6 +260,119 @@ extract_r = function(path, sims, sim_type,
   
 }
 
+# Extract relevant information from ncvsurv simulation results
+extract_ncvsurv = function(path, sims, sim_type,
+                           p_tot = 100, p_true = 5, trace = 0,
+                           beta_true = rep(1,length(sims))){
+  
+  # Save summary output in out_mat
+  ## labs = labels of columns of out_mat
+  labs = c(str_c("Beta",1:(p_true)),"TP % Fixef","FP % Fixef",
+           "Median Time (sec)","Abs. Dev. (Mean)") # ,"L1 Norm (Mean)"
+  out_mat = matrix(0, nrow = length(sims), ncol = length(labs))
+  colnames(out_mat) = labs
+  rownames(out_mat) = sim_type
+  
+  # Save additional fixed effect information
+  beta_lst = list()
+  
+  y_lst = list()
+  
+  # Average values for all fixed effects selected in best model as well as
+  ## average variances selected in best models
+  beta_all_avg = matrix(0, nrow = length(sims), ncol = p_tot)
+  rownames(beta_all_avg) = sim_type
+  colnames(beta_all_avg) = str_c("Beta",1:p_tot)
+  
+  # Save bias information
+  abs_dev_lst = list()
+  # Save time information
+  time_lst = list()
+  
+  # Save death rate and censoring rate information
+  event_rate_lst = list()
+  
+  for(m in 1:length(sims)){
+    
+    files = list.files(path = str_c(path, sims[m]), full.names = T)
+    if(trace == 1){
+      cat("completed replicates: ", length(files), "\n")
+    }
+    
+    time_mat = numeric(length(files))
+    
+    beta_mat = matrix(0, nrow = length(files), ncol = p_tot)
+    abs_dev = numeric(length(files)) # Mean absolute deviation
+    y_summary = matrix(NA, nrow = length(files), ncol = 6)
+    colnames(y_summary) = c("Min","Q1","Median","Q3","Max","Mean")
+    event_rate_mat = matrix(NA, nrow = length(files), ncol = 2)
+    colnames(event_rate_mat) = c("death_rate","censor_rate")
+    
+    for(f in 1:length(files)){
+      # load output list object
+      load(files[f])
+      beta_mat[f,] = output$coef_mat
+      beta_vec = output$coef_mat[,c(1:p_true)]
+      beta_non0 = beta_vec[which(beta_vec != 0)]
+      if(length(beta_non0) >= 1){
+        abs_dev[f] = mean(abs(beta_non0 - rep(beta_true[m],times=length(beta_non0))))
+      }else{
+        abs_dev[f] = NA
+      }
+      time_mat[f] = output$time_mat[1,3]
+      
+      y_tmp = output$y_times
+      if(!is.null(y_tmp)){
+        y_summary[f,] = c(min(y_tmp),quantile(y_tmp,probs = c(0.25,0.5,0.75)),max(y_tmp),mean(y_tmp))
+      }
+      if(!is.null(output$death_rate)){
+        event_rate_mat[f,1] = output$death_rate
+        event_rate_mat[f,2] = 1 - output$death_rate
+      }
+    } # End f for loop
+    
+    abs_dev_lst[[m]] = abs_dev
+    
+    time_lst[[m]] = time_mat
+    
+    event_rate_lst[[m]] = event_rate_mat
+    
+    # True and false positives - fixed effects, random effects,
+    out = numeric(length(labs))
+    names(out) = labs
+    
+    
+    for(i in 1:p_true){
+      out[i] = mean(beta_mat[which(beta_mat[,i] != 0),i])
+      # Note: will be NA if never != 0
+      beta_all_avg[m,i] = mean(beta_mat[which(beta_mat[,i] != 0),i])
+    }
+    out[p_true+1] = sum(beta_mat[,c(1:p_true)] != 0) / length(files) * (1 / (p_true) * 100)
+    out[p_true+2] = sum(beta_mat[,-c(1:p_true)] != 0) / length(files) * (1 / (p_tot - p_true) * 100)
+    out[p_true+3] = median(time_mat)
+    out[p_true+4] = mean(abs_dev, na.rm = TRUE)
+    
+    out_mat[m,] = out
+    
+    beta_lst[[m]] = beta_mat
+    
+    y_lst[[m]] = y_summary
+  }
+  
+  
+  
+  out_mat = round(out_mat, digits = 2)
+  
+  return(list(out_mat = out_mat,
+              beta_all_avg = beta_all_avg, 
+              y_lst = y_lst,
+              time_lst = time_lst,
+              abs_dev_lst = abs_dev_lst,
+              event_rate_lst = event_rate_lst))
+  
+}
+
+
 ####################################################################################################################
 # Variable selection for piecewise exponential mixed models, p=100
 ####################################################################################################################
@@ -298,6 +410,124 @@ res = extract_r(path = path, sims = sims, sim_type = sim_type,
                 p_tot = 500, q = 6, p_true = 5, r_true_vec = rep(3,length(sims)),
                 trace = 0, beta_true = rep(c(0.5,1.0),each=4))
 save(res, file = sprintf("%s/phmmPen_FA_p500.RData",path_output))
+
+
+####################################################################################################################
+# Supplemental simulations: Variable selection using ncvreg (fixed effects only), p=100
+####################################################################################################################
+
+# Path to full simulation results
+path = sprintf("%s/ncvsurv_01/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:8)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep(c("0.5","1.0"),each=4),
+                 "_K_",rep(rep(c(5,10),each=2),times=2),
+                 "_B_",rep(c("Small","Moder"),times=4))
+res = extract_ncvsurv(path = path, sims = sims, sim_type = sim_type,
+                      p_tot = 100, p_true = 5,
+                      trace = 0, beta_true = rep(c(0.5,1.0),each=4))
+save(res, file = "Paper_Results/ncvsurv.RData")
+
+
+####################################################################################################################
+# Supplemental simulations: Weibull-simulated mixed effects survival data with 
+#   variable selection performed using phmmPen_FA, p=100
+####################################################################################################################
+
+# Path to full simulation results
+path = sprintf("%s/Weibull_01/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:8)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep(c("0.5","1.0"),each=4),
+                 "_K_",rep(rep(c(5,10),each=2),times=2),
+                 "_B_",rep(c("Small","Moder"),times=4),
+                 "_r_",rep("GR",times=8))
+res = extract_r(path = path, sims = sims, sim_type = sim_type,
+                p_tot = 100, q = 6, p_true = 5, r_true_vec = rep(3,length(sims)),
+                trace = 0, beta_true = rep(c(0.5,1.0),each=4))
+save(res, file = "Paper_Results/Weibull.RData")
+
+####################################################################################################################
+# Variable selection for piecewise exponential mixed models with 
+# unequal numbers of true fixed and random effects predictors, p=100
+####################################################################################################################
+
+# Path to full simulation results
+path = sprintf("%s/alt_num_ranef_01/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:4)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep("1.0",times=4),
+                 "_K_",rep(c(5,10),each=2),
+                 "_B_",rep(c("Small","Moder"),times=2),
+                 "_r_",rep("GR",times=4))
+res = extract_r(path = path, sims = sims, sim_type = sim_type,
+                p_tot = 100, p_true = 10, q = 6, r_true_vec = rep(3,length(sims)),
+                trace = 0, beta_true = rep(c(1.0),times=4))
+save(res, file = "Paper_Results/alt_num_ranef.RData")
+
+####################################################################################################################
+# Variable selection for piecewise exponential mixed models when
+# purposefully underestimating the number of latent factors r, p=100
+####################################################################################################################
+
+# Path to full simulation results
+path = sprintf("%s/alt_rval_01/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:6)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep(c("0.5","1.0"),each=3),
+                 "_K_",rep(10,times=6),
+                 "_B_",rep("Moder",times=6),
+                 "_r_",rep(c(5,3,2),times=2))
+res = extract_r(path = path, sims = sims, sim_type = sim_type,
+                p_tot = 100, q = 6, p_true = 5, r_true_vec = rep(5,length(sims)),
+                trace = 0, beta_true = rep(c(0.5,1.0),each=3))
+save(res, file = "Paper_Results/alt_rval.RData")
+
+
+####################################################################################################################
+# Variable selection for piecewise exponential mixed models, p=100
+####################################################################################################################
+
+
+# Path to full simulation results
+path = sprintf("%s/alt_J_01/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:8)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep(c("0.5"),each=8),
+                 "_K_",rep(c(5,10),each=4),
+                 "_B_",rep(rep(c("Small","Moder"),each=2),times=2),
+                 "_r_",rep(c("GR"),times=8),
+                 "_J_",rep(c(6,5),times=4))
+res = extract_r(path = path, sims = sims, sim_type = sim_type,
+                p_tot = 100, q = 6, p_true = 5, r_true_vec = rep(3,length(sims)),
+                trace = 0, beta_true = rep(c(0.5),each=8))
+save(res, file = "Paper_Results/alt_J_5and6.RData")
+
+####################################################################################################################
+# Variable selection for piecewise exponential mixed models, p=100
+####################################################################################################################
+
+# Path to full simulation results
+path = sprintf("%s/alt_J_01B/",path_sims)
+# Sub-folders with individual simulation results
+sims = str_c("sim",1:8)
+# Description of individual simulation results
+sim_type = str_c("Beta_",rep(c("0.5"),each=8),
+                 "_K_",rep(c(5,10),each=4),
+                 "_B_",rep(rep(c("Small","Moder"),each=2),times=2),
+                 "_r_",rep(c("GR"),times=8),
+                 "_J_",rep(c(9,10),times=4))
+res = extract_r(path = path, sims = sims, sim_type = sim_type,
+                p_tot = 100, q = 6, p_true = 5, r_true_vec = rep(3,length(sims)),
+                trace = 0, beta_true = rep(c(0.5),each=8))
+save(res, file = "Paper_Results/alt_J_9and10.RData")
+
+
 
 ####################################################################################################################
 # 
